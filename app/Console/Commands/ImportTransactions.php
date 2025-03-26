@@ -11,7 +11,7 @@ use League\Csv\Reader;
 
 class ImportTransactions extends Command
 {
-    protected $signature = 'import:transactions {filename} {email}';
+    protected $signature = 'import:transactions {filename} {email} {--T|test}';
     protected $description = 'Import transactions from CSV file';
 
     public function handle(): void
@@ -30,11 +30,18 @@ class ImportTransactions extends Command
         $processedData = $this->processCsvData($csvData, $user);
         if (!$processedData) return;
 
-        $uniqueData = $this->filterDuplicates($processedData, $user);
+        $duplicates = $this->findDuplicates($processedData, $user);
 
-        $this->insertTransactions($uniqueData, $user);
+        if ($this->option('test')) {
+            $this->displayTestResults($processedData, $duplicates);
+            return;
+        }
+
+        $uniqueData = array_filter($processedData, fn($item) => !in_array($item, $duplicates));
+        $this->insertTransactions($uniqueData);
 
         $this->info("Import terminé. " . count($uniqueData) . " transactions ajoutées.");
+        $this->info(count($duplicates) . " doublons ignorés.");
     }
 
     private function getUser(string $email): ?User
@@ -81,7 +88,7 @@ class ImportTransactions extends Command
                     : (float)str_replace(',', '.', $row['Credit']);
 
                 return [
-                    'user_id' => $user->getAttribute('id'),
+                    'user_id' => $user->id,
                     'operation_date' => Carbon::createFromFormat('Y/m/d', $row['Date operation'])->format('Y-m-d'),
                     'value_date' => Carbon::createFromFormat('Y/m/d', $row['Date de valeur'])->format('Y-m-d'),
                     'category' => $row['Categorie'],
@@ -100,31 +107,64 @@ class ImportTransactions extends Command
         }, $csvData));
     }
 
-    private function filterDuplicates(array $data, User $user): array
+    private function findDuplicates(array $data, User $user): array
     {
-        $existingKeys = Transaction::query()->where('user_id', $user->getAttribute('id'))
+        $existing = Transaction::query()->where('user_id', $user->getAttribute('id'))
             ->get()
-            ->mapWithKeys(fn($t) => [
-                implode('|', [
-                    $t->operation_date,
-                    $t->value_date,
-                    $t->amount,
-                    $t->description
-                ]) => true
-            ])
-            ->toArray();
+            ->map(function ($transaction) {
+                // Convertit le montant en centimes pour la comparaison
+                $transaction->amount = (int)round($transaction->amount * 100);
+                return $transaction;
+            })
+            ->keyBy(function ($transaction) {
+                return sprintf("%s|%s|%s",
+                    $transaction->operation_date->format('Y-m-d'),
+                    $transaction->amount,
+                    trim($transaction->description)
+                );
+            });
 
-        return array_filter($data, fn($item) => !isset($existingKeys[
-            implode('|', [
+        $duplicates = [];
+        foreach ($data as $item) {
+            $key = sprintf("%s|%s|%s",
                 $item['operation_date'],
-                $item['value_date'],
                 $item['amount'],
-                $item['description']
-            ])
-            ]));
+                trim($item['description'])
+            );
+
+            if ($existing->has($key)) {
+                $duplicates[] = $item;
+            }
+        }
+
+        return $duplicates;
     }
 
-    private function insertTransactions(array $data, User $user): void
+    private function displayTestResults(array $data, array $duplicates): void
+    {
+        $this->line('=== TEST DE DETECTION DE DOUBLONS ===');
+        $this->line(sprintf(
+            "Transactions analysées: %d / Doublons détectés: %d",
+            count($data),
+            count($duplicates)
+        ));
+
+        if (!empty($duplicates)) {
+            $this->table(
+                ['Date Opération', 'Montant', 'Description'],
+                array_map(function ($d) {
+                    $montant = $d['amount'] / 100;
+                    return [
+                        $d['operation_date'],
+                        ($montant < 0 ? '-' : '') . number_format(abs($montant), 2),
+                        substr($d['description'], 0, 50)
+                    ];
+                }, $duplicates)
+            );
+        }
+    }
+
+    private function insertTransactions(array $data): void
     {
         if (empty($data)) {
             $this->info("Aucune nouvelle transaction à importer.");
