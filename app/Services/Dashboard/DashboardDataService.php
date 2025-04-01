@@ -3,7 +3,6 @@
 namespace App\Services\Dashboard;
 
 use App\DataTransferObjects\DashboardData;
-use Illuminate\Support\Collection;
 
 class DashboardDataService
 {
@@ -68,8 +67,5 @@ class DashboardDataService
         return '#' . dechex(crc32($category) & 0xFFFFFF);
     }
 
-    public function getTransactionService(): TransactionService
-    {
-        return $this->transactionService;
-    }
+
 }

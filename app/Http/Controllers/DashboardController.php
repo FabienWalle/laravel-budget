@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Services\Dashboard\ChartService;
 use App\Services\Dashboard\DashboardDataService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -17,15 +16,31 @@ class DashboardController extends Controller
 
     public function index(Request $request): View
     {
-        $filters = [
-            'filterType' => $request->input('filter', 'all'),
-            'year' => $request->input('year'),
-            'month' => $request->input('month'),
-        ];
+        $filterType = $this->sanitizeFilterType($request->input('filter', 'all'));
+        $selectedYear = $request->input('year');
+        $selectedMonth = $request->input('month');
+
+        if ($filterType === 'month' && $request->has('monthYear')) {
+            $monthYear = $request->input('monthYear');
+            if (is_string($monthYear) && str_contains($monthYear, '-')) {
+                [$selectedYear, $selectedMonth] = explode('-', $monthYear);
+            }
+        }
+
+        if ($filterType === 'all') {
+            $selectedYear = null;
+            $selectedMonth = null;
+        } elseif ($filterType === 'year') {
+            $selectedMonth = null;
+        }
 
         $dashboardData = $this->dashboardDataService->getDashboardData(
             auth()->id(),
-            $filters
+            [
+                'filterType' => $filterType,
+                'year' => $selectedYear,
+                'month' => $selectedMonth
+            ]
         );
 
         $chart = $this->chartService->buildExpensesChart(
@@ -47,12 +62,9 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function getMonths(Request $request): JsonResponse
+    private function sanitizeFilterType(?string $filter): string
     {
-        $months = $this->dashboardDataService
-            ->getTransactionService()
-            ->getAvailableMonths(auth()->id(), $request->query('year'));
-
-        return response()->json($months);
+        $validFilters = ['all', 'year', 'month'];
+        return in_array($filter, $validFilters) ? $filter : 'all';
     }
 }

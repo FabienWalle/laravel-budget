@@ -1,20 +1,19 @@
 <div class="mb-6 bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
     <form id="dateFilterForm" method="GET" action="{{ route('dashboard') }}">
-        <div class="flex flex-wrap items-center gap-4">
-            <!-- Filtre Toutes dates -->
+        <fieldset class="flex flex-wrap items-center gap-4">
+            <legend class="sr-only">Filtres de date</legend>
+
             <div class="flex items-center">
                 <input type="radio" id="filterAll" name="filter" value="all"
                        {{ $currentFilter === 'all' ? 'checked' : '' }} class="mr-2">
-                <label for="filterAll" class="cursor-pointer">Toutes les dates</label>
+                <label for="filterAll" class="cursor-pointer px-2">Toutes les dates</label>
             </div>
 
-            <!-- Filtre Année -->
             <div class="flex items-center">
-                <input type="radio" id="filterYear" name="filter" value="year"
+                <input type="radio" id="yearSelect" name="filter" value="year"
                        {{ $currentFilter === 'year' ? 'checked' : '' }} class="mr-2">
-                <label for="filterYear" class="cursor-pointer mr-2">Année</label>
-                <select name="year" id="yearSelect" class="dark:bg-gray-800 rounded"
-                    {{ $currentFilter !== 'year' ? 'disabled' : '' }}>
+                <label for="yearSelect" class="cursor-pointer px-2">Année</label>
+                <select name="year" id="yearSelect" class="dark:bg-gray-800 rounded" aria-labelledby="filterYearRadio">
                     @foreach($availableYears as $year)
                         <option value="{{ $year }}"
                             {{ $selectedYear == $year ? 'selected' : '' }}>
@@ -24,38 +23,37 @@
                 </select>
             </div>
 
-            <!-- Filtre Mois -->
             <div class="flex items-center">
                 <input type="radio" id="filterMonth" name="filter" value="month"
                        {{ $currentFilter === 'month' ? 'checked' : '' }} class="mr-2">
-                <label for="filterMonth" class="cursor-pointer mr-2">Mois</label>
-                <select name="year" id="monthYearSelect" class="dark:bg-gray-800 rounded mr-2"
-                    {{ $currentFilter !== 'month' ? 'disabled' : '' }}>
-                    @foreach($availableYears as $year)
-                        <option value="{{ $year }}"
-                            {{ $selectedYear == $year ? 'selected' : '' }}>
-                            {{ $year }}
-                        </option>
-                    @endforeach
-                </select>
-                <select name="month" id="monthSelect" class="dark:bg-gray-800 rounded"
-                    {{ $currentFilter !== 'month' ? 'disabled' : '' }}>
-                    @if($currentFilter === 'month' && isset($availableMonths[$selectedYear]))
-                        @foreach($availableMonths[$selectedYear] as $month)
-                            <option value="{{ $month }}"
-                                {{ $selectedMonth == $month ? 'selected' : '' }}>
-                                {{ DateTime::createFromFormat('!m', $month)->format('F') }}
+                <label for="filterMonth" class="cursor-pointer px-2">Mois</label>
+                <select name="monthYear" id="filterMonth" class="dark:bg-gray-800 rounded"
+                        aria-labelledby="filterMonthRadio">
+                    <option value="">-- Sélectionnez --</option>
+                    @foreach($availableYears->sortDesc() as $year)
+                        @foreach(($availableMonths[$year] ?? [])->sort() as $month)
+                            <option value="{{ $year }}-{{ $month }}"
+                                {{ $selectedYear == $year && $selectedMonth == $month ? 'selected' : '' }}>
+                                {{
+                                    \Carbon\Carbon::createFromDate($year, $month, 1)
+                                        ->locale('fr')
+                                        ->isoFormat('MMMM YYYY')
+                                }}
                             </option>
                         @endforeach
-                    @endif
+                    @endforeach
                 </select>
             </div>
 
-            <!-- Bouton Appliquer -->
             <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
-                Appliquer
+                Filtrer
             </button>
-        </div>
+
+            <a href="{{ route('dashboard') }}"
+               class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors">
+                Réinitialiser
+            </a>
+        </fieldset>
     </form>
 </div>
 
@@ -63,48 +61,48 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('dateFilterForm');
-            const filterAll = document.getElementById('filterAll');
-            const filterYear = document.getElementById('filterYear');
-            const filterMonth = document.getElementById('filterMonth');
             const yearSelect = document.getElementById('yearSelect');
             const monthYearSelect = document.getElementById('monthYearSelect');
-            const monthSelect = document.getElementById('monthSelect');
 
-            // Gestion du changement de filtre
-            [filterAll, filterYear, filterMonth].forEach(input => {
-                input.addEventListener('change', function() {
-                    yearSelect.disabled = this.value !== 'year';
-                    monthYearSelect.disabled = this.value !== 'month';
-                    monthSelect.disabled = this.value !== 'month';
+            [yearSelect, monthYearSelect].forEach(select => {
+                select.addEventListener('mousedown', function(e) {
+                    e.stopPropagation();
+                });
+                select.addEventListener('click', function(e) {
+                    e.stopPropagation();
                 });
             });
 
-            // Chargement des mois quand l'année change
-            monthYearSelect?.addEventListener('change', function() {
-                const year = this.value;
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
 
-                fetch(`/dashboard/get-months?year=${year}`)
-                    .then(response => {
-                        if (!response.ok) throw new Error('Erreur réseau');
-                        return response.json();
-                    })
-                    .then(months => {
-                        monthSelect.innerHTML = '';
+                const formData = new FormData(form);
+                const filterType = formData.get('filter').toString();
+                const params = new URLSearchParams();
 
-                        months.forEach(month => {
-                            const date = new Date();
-                            date.setMonth(month - 1);
-                            const monthName = date.toLocaleString('fr-FR', { month: 'long' });
-                            const option = new Option(
-                                monthName.charAt(0).toUpperCase() + monthName.slice(1),
-                                month
-                            );
-                            monthSelect.add(option);
-                        });
-                    })
-                    .catch(error => {
-                        console.error('Erreur:', error);
-                    });
+                if (filterType === 'year') {
+                    const year = formData.get('year').toString();
+                    if (!year) {
+                        alert('Veuillez sélectionner une année');
+                        return;
+                    }
+                    params.set('filter', 'year');
+                    params.set('year', year);
+                } else if (filterType === 'month') {
+                    const monthYear = formData.get('monthYear').toString();
+                    if (!monthYear) {
+                        alert('Veuillez sélectionner un mois');
+                        return;
+                    }
+                    params.set('filter', 'month');
+                    const [year, month] = monthYear.split('-');
+                    params.set('year', year);
+                    params.set('month', month);
+                } else {
+                    params.set('filter', 'all');
+                }
+
+                window.location.href = `${form.action}?${params.toString()}`;
             });
         });
     </script>
