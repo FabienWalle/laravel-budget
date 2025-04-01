@@ -2,85 +2,57 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Transaction;
-use IcehouseVentures\LaravelChartjs\Facades\Chartjs;
+use App\Services\Dashboard\ChartService;
+use App\Services\Dashboard\DashboardDataService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(): View
+    public function __construct(
+        private readonly DashboardDataService $dashboardDataService,
+        private readonly ChartService $chartService
+    ) {}
+
+    public function index(Request $request): View
     {
-        $transactions = Transaction::query()
-            ->where('amount', '<', 0)
-            ->where('user_id', auth()->id())
-            ->selectRaw('category, sum(abs(amount)) as total_amount_cents')
-            ->groupBy('category')
-            ->orderByDesc('total_amount_cents')
-            ->get();
+        $filters = [
+            'filterType' => $request->input('filter', 'all'),
+            'year' => $request->input('year'),
+            'month' => $request->input('month'),
+        ];
 
-        $totalCents = $transactions->sum('total_amount_cents');
+        $dashboardData = $this->dashboardDataService->getDashboardData(
+            auth()->id(),
+            $filters
+        );
 
-        $labels = [];
-        $data = [];
-        $backgroundColors = [];
-        $tooltipLabels = [];
+        $chart = $this->chartService->buildExpensesChart(
+            $dashboardData->chartLabels,
+            $dashboardData->chartData,
+            $dashboardData->chartColors,
+            $dashboardData->tooltipLabels
+        );
 
-        foreach ($transactions as $transaction) {
-            $amountEuros = $transaction->total_amount_cents / 100;
-            $percentage = $totalCents > 0 ? round(($transaction->total_amount_cents / $totalCents) * 100) : 0;
-
-            $labels[] = $transaction->category;
-            $data[] = $amountEuros;
-            $backgroundColors[] = '#' . substr(md5($transaction->category), 0, 6);
-            $tooltipLabels[] = sprintf(
-                "%s: %.2f€ (%d%%)",
-                $transaction->category,
-                $amountEuros,
-                $percentage
-            );
-        }
-
-        $chart = Chartjs::build()
-            ->name('ExpensesChart')
-            ->type('pie')
-            ->size(['width' => 400, 'height' => 400])
-            ->labels($labels)
-            ->datasets([
-                [
-                    'label' => 'Dépenses par catégorie',
-                    'data' => $data,
-                    'backgroundColor' => $backgroundColors,
-                    'borderColor' => '#fff',
-                    'borderWidth' => 1,
-                ]
-            ])
-            ->options([
-                'responsive' => true,
-                'maintainAspectRatio' => false,
-                'plugins' => [
-                    'legend' => [
-                        'position' => 'right',
-                    ],
-                    'tooltip' => [
-                        'callbacks' => [
-                            'label' => 'function(context) {
-                                return ' . json_encode($tooltipLabels) . '[context.dataIndex];
-                            }'
-                        ]
-                    ]
-                ]
-            ]);
-
-        return view('dashboard', [
+        return view('dashboard.index', [
             'chart' => $chart,
-            'total' => $totalCents / 100,
-            'transactions' => $transactions->map(function($item) use ($totalCents) {
-                return [
-                    'category' => $item->category,
-                    'amount' => $item->total_amount_cents / 100,
-                    'percentage' => $totalCents > 0 ? round(($item->total_amount_cents / $totalCents) * 100) : 0
-                ];
-            })
+            'total' => $dashboardData->totalAmount,
+            'transactions' => $dashboardData->transactions,
+            'availableYears' => $dashboardData->availableYears,
+            'availableMonths' => $dashboardData->availableMonths,
+            'currentFilter' => $dashboardData->filterType,
+            'selectedYear' => $dashboardData->selectedYear,
+            'selectedMonth' => $dashboardData->selectedMonth,
         ]);
+    }
+
+    public function getMonths(Request $request): JsonResponse
+    {
+        $months = $this->dashboardDataService
+            ->getTransactionService()
+            ->getAvailableMonths(auth()->id(), $request->query('year'));
+
+        return response()->json($months);
     }
 }
