@@ -130,6 +130,7 @@ class ImportTransactions extends Command
             'value_date' => Carbon::createFromFormat('Y/m/d', $row['Date de valeur'])->format('Y-m-d'),
             'category' => $row['Categorie'],
             'sub_category' => $row['Sous categorie'],
+            'custom_category'=>$row['Sous categorie'],
             'description' => $row['Libelle operation'],
             'short_description' => $row['Libelle simplifie'],
             'amount' => (int)round($amount * 100),

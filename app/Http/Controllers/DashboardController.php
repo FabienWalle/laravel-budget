@@ -20,18 +20,17 @@ class DashboardController extends Controller
         $selectedYear = $request->input('year');
         $selectedMonth = $request->input('month');
 
-        if ($filterType === 'month' && $request->has('monthYear')) {
-            $monthYear = $request->input('monthYear');
-            if (is_string($monthYear) && str_contains($monthYear, '-')) {
-                [$selectedYear, $selectedMonth] = explode('-', $monthYear);
-            }
+        if ($filterType === 'month' && ($monthYear = $request->input('monthYear'))) {
+            [$selectedYear, $selectedMonth] = array_pad(explode('-', $monthYear), 2, null);
         }
 
-        if ($filterType === 'all') {
-            $selectedYear = null;
-            $selectedMonth = null;
-        } elseif ($filterType === 'year') {
-            $selectedMonth = null;
+        switch ($filterType) {
+            case 'all':
+                $selectedYear = $selectedMonth = null;
+                break;
+            case 'year':
+                $selectedMonth = null;
+                break;
         }
 
         $dashboardData = $this->dashboardDataService->getDashboardData(

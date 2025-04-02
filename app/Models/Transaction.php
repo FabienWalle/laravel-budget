@@ -13,6 +13,7 @@ class Transaction extends Model
     protected $fillable = [
         'category',
         'sub_category',
+        'custom_category',
         'description',
         'short_description',
         'amount',

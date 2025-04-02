@@ -22,6 +22,7 @@ return new class extends Migration
             $table->date('value_date');
             $table->string('category');
             $table->string('sub_category');
+            $table->string('custom_category')->nullable();
             $table->timestamps();
 
             $table->index('user_id');
