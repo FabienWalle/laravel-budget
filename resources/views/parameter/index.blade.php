@@ -5,11 +5,19 @@
         </h2>
     </x-slot>
 
-    <div class="max-w-4xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div class="max-w-7xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
         @foreach ($transactions as $short_description => $group)
             <details class="mb-4 border border-gray-300 dark:border-gray-600 rounded-md">
-                <summary class="p-3 cursor-pointer bg-gray-100 dark:bg-gray-700 rounded-t-md">
-                    <strong>{{ $short_description }}</strong> ({{ count($group) }} transactions)
+                <summary class="p-3 cursor-pointer bg-gray-100 dark:bg-gray-700 rounded-t-md grid grid-cols-10 gap-4">
+                    <strong class="col-span-3 text-wrap dark:text-white flex items-center">{{ $short_description }}</strong>
+                    <span class="col-span-1 dark:text-white flex items-center text-center">
+                        {{ count($group) }}
+                    </span>
+                    <div class="col-span-6">
+                        <x-forms.update-transactions-category
+                            :transactionIds="$group->pluck('id')->toArray()"
+                        />
+                    </div>
                 </summary>
                 <div class="p-3 bg-gray-50 dark:bg-gray-900 rounded-b-md">
                     <ul class="space-y-2">

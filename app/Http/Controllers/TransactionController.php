@@ -67,6 +67,21 @@ class TransactionController extends Controller
             ->with('success', 'Transaction mise à jour avec succès');
     }
 
+    public function updateCategoryTransactions(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'transaction_ids' => 'required|array',
+            'transaction_ids.*' => 'exists:transactions,id',
+            'new_custom_category' => 'required|string|max:255',
+        ]);
+
+        Transaction::query()->where('user_id', auth()->id())
+            ->whereIn('id', $validated['transaction_ids'])
+            ->update(['custom_category' => $validated['new_custom_category']]);
+
+        return redirect()->route('parameter')->with('success', 'Catégorie mise à jour avec succès.');
+    }
+
     public function destroy(Transaction $transaction): RedirectResponse
     {
         $transaction->delete();
