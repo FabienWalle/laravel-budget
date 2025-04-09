@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ParameterController;
 use App\Http\Controllers\ProfileController;
@@ -14,7 +15,12 @@ Route::put('/transactions/update-category', [TransactionController::class, 'upda
     ->middleware(['auth', 'verified'])->name('transactions.update-category');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+
 Route::get('/parameter', [ParameterController::class, 'index'])->middleware(['auth', 'verified'])->name('parameter');
+
+Route::get('/analytics', [AnalyticsController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('analytics');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

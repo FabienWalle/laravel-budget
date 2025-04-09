@@ -5,11 +5,17 @@
         </h2>
     </x-slot>
 
-    <div class="max-w-7xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div class="max-w-7xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow mt-2">
         @foreach ($transactions as $short_description => $group)
             <details class="mb-4 border border-gray-300 dark:border-gray-600 rounded-md">
                 <summary class="p-3 cursor-pointer bg-gray-100 dark:bg-gray-700 rounded-t-md grid grid-cols-10 gap-4">
-                    <strong class="col-span-3 text-wrap dark:text-white flex items-center">{{ $short_description }}</strong>
+                    <span class="col-span-3 text-wrap dark:text-white flex items-center gap-2">
+                        <strong>
+                            {{ $short_description }}
+                        </strong>
+                        <span class="text-sm">
+                            {{ $group->pluck('custom_category')->unique()->implode(', ') }}
+                        </span></span>
                     <span class="col-span-1 dark:text-white flex items-center text-center">
                         {{ count($group) }}
                     </span>
@@ -31,6 +37,7 @@
                                 <span class="text-gray-700 dark:text-gray-300 text-sm">
                                     {{ $transaction->description }}
                                 </span>
+                                <span>{{$transaction->custom_category}}</span>
                             </li>
                         @endforeach
                     </ul>
